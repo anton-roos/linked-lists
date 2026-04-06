@@ -51,7 +51,5 @@ int main()
     //remove element 38
     list.remove_position(2); //element 38 is in position 2
     list.displayList();
-    return 0;
-    
-    system("pause>0");
+    system("pause>nul");
 }
