@@ -127,8 +127,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CodeA.cpp" />
-    <ClCompile Include="LinkedList.cpp" />
+    <ClCompile Include="src/CodeA.cpp" />
+    <ClCompile Include="src/LinkedList.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
