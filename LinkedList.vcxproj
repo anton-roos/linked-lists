@@ -127,6 +127,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Abstractions.cpp" />
     <ClCompile Include="src/CodeA.cpp" />
     <ClCompile Include="src/LinkedList.cpp" />
   </ItemGroup>
