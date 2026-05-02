@@ -127,9 +127,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Abstractions.cpp" />
     <ClCompile Include="src/CodeA.cpp" />
     <ClCompile Include="src/LinkedList.cpp" />
+    <ClCompile Include="src\62233467_AS1.cpp" />
+    <ClCompile Include="src\Abstractions.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="src\pseudocode.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

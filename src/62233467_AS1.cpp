@@ -14,7 +14,6 @@
 using namespace std;
 
 // Data structures
-
 // One row of the final "Generated Orders" report.
 struct OrderLogEntry {
     int  time;
@@ -23,34 +22,41 @@ struct OrderLogEntry {
 };
 
 // Output helpers
-
-// Print a queue's contents in the form "Queue X: [X(t), X(t), ...]". The queue
-// is taken by value so we can drain it without disturbing the simulation.
+// Print a queue's contents in the form "Queue S: [S(1), S(1), S(2)]". 
+// The queue is taken by value so we can drain it without disturbing the simulation.
 void printQueue(char type, queue<int> q) {
     cout << "Queue " << type << ": [";
+    
     bool first = true;
     while (!q.empty()) {
+        // add comma in front of items that is not the first item
         if (!first) cout << ", ";
         cout << type << "(" << q.front() << ")";
         q.pop();
         first = false;
     }
+    
     cout << "]\n";
 }
 
-// Print the dispatched truck stack from top (last dispatched) to bottom.
+// Print the dispatched truck stack from top to bottom.
 void printStack(stack<string> s) {
+    // simply print "Stack: empty" when the stack is empty and exit early
     if (s.empty()) {
         cout << "Stack: empty\n";
         return;
     }
+    
     cout << "Stack of Dispatched Trucks:\n";
     cout << "  Top -> " << s.top() << "\n";
+    
     s.pop();
+    
     while (!s.empty()) {
         cout << "         " << s.top() << "\n";
         s.pop();
     }
+    
     cout << "  Bottom\n";
 }
 
