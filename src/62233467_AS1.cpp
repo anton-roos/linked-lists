@@ -13,9 +13,7 @@
 
 using namespace std;
 
-// -----------------------------------------------------------------------------
 // Data structures
-// -----------------------------------------------------------------------------
 
 // One row of the final "Generated Orders" report.
 struct OrderLogEntry {
@@ -24,9 +22,7 @@ struct OrderLogEntry {
     int  processing_time;
 };
 
-// -----------------------------------------------------------------------------
 // Output helpers
-// -----------------------------------------------------------------------------
 
 // Print a queue's contents in the form "Queue X: [X(t), X(t), ...]". The queue
 // is taken by value so we can drain it without disturbing the simulation.
@@ -58,14 +54,9 @@ void printStack(stack<string> s) {
     cout << "  Bottom\n";
 }
 
-// -----------------------------------------------------------------------------
-// Main simulation (mirrors the pseudocode step-for-step)
-// -----------------------------------------------------------------------------
 
 int main() {
-    // ----------------------------
     // Initialize simulation parameters
-    // ----------------------------
     constexpr int time_steps     = 30;
     constexpr int truck_capacity = 5;
     constexpr array<char, 3> order_types{'S', 'M', 'B'};
@@ -95,15 +86,11 @@ int main() {
     cout << "=== Warehouse Order Dispatch Simulation ===\n";
     cout << "Time steps: " << time_steps
          << ", Truck capacity: " << truck_capacity << "\n\n";
-
-    // ----------------------------
+    
     // Simulation loop
-    // ----------------------------
     for (int time = 1; time <= time_steps; ++time) {
 
-        // ----------------------------
         // Generate new random orders
-        // ----------------------------
         int num_new_orders = arrivalDist(gen);
         vector<char> newArrivals;
         newArrivals.reserve(num_new_orders);
@@ -122,9 +109,7 @@ int main() {
             newArrivals.push_back(order_type);
         }
 
-        // ----------------------------
         // Process queues
-        // ----------------------------
         for (char queue_type : order_types) {
             // Pick the queue corresponding to this type.
             queue<int>* q = nullptr;
@@ -154,9 +139,7 @@ int main() {
             }
         }
 
-        // ----------------------------
         // Display current state
-        // ----------------------------
         cout << "Time Step: " << time << "\n";
 
         // Print new arrivals.
@@ -181,12 +164,8 @@ int main() {
 
         cout << "\n";
     }
-
-    // ----------------------------
-    // Print final generated orders table
-    // ----------------------------
-    cout << "============================================\n";
-    cout << "Generated Orders (time_step,type,processing_time):\n";
+    
+    // Print final generated orders tabel
     cout << "time_step,type,processing_time\n";
     for (const auto& o : OrderLog) {
         cout << o.time << "," << o.type << "," << o.processing_time << "\n";
