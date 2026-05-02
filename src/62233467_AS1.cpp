@@ -8,114 +8,82 @@
 #include <vector>
 #include <random>
 #include <string>
+#include <map>
 #include <array>
+
 using namespace std;
 
+// -----------------------------------------------------------------------------
 // Data structures
+// -----------------------------------------------------------------------------
 
-// A single order arriving at the warehouse.
-struct Order {
-    char type; // 'S', 'M', or 'B'
-    int  remaining; // remaining processing time (decremented each step)
-    int  processing_time; // original processing time (kept for the final report)
-    int  time_step; // time step at which the order arrived
+// One row of the final "Generated Orders" report.
+struct OrderLogEntry {
+    int  time;
+    char type;
+    int  processing_time;
 };
 
-// A truck being filled or already dispatched.
-struct Truck {
-    int  number; // per-type sequence number: Truck1[S], Truck2[S], ...
-    char type; // type of orders this truck carries
-    vector<Order> orders;
-};
+// -----------------------------------------------------------------------------
+// Output helpers
+// -----------------------------------------------------------------------------
 
-// Output helpers (queues / stack are passed by value so we can drain them
-// for printing without disturbing the live simulation state).
-void printQueue(const string& label, queue<Order> q) {
-    cout << "Queue " << label << ": [";
+// Print a queue's contents in the form "Queue X: [X(t), X(t), ...]". The queue
+// is taken by value so we can drain it without disturbing the simulation.
+void printQueue(char type, queue<int> q) {
+    cout << "Queue " << type << ": [";
     bool first = true;
     while (!q.empty()) {
         if (!first) cout << ", ";
-        cout << q.front().type << "(" << q.front().remaining << ")";
+        cout << type << "(" << q.front() << ")";
         q.pop();
         first = false;
     }
     cout << "]\n";
 }
 
-void printStack(stack<Truck> s) {
+// Print the dispatched truck stack from top (last dispatched) to bottom.
+void printStack(stack<string> s) {
     if (s.empty()) {
         cout << "Stack: empty\n";
         return;
     }
     cout << "Stack of Dispatched Trucks:\n";
-    cout << "  Top -> Truck" << s.top().number << "[" << s.top().type << "]\n";
+    cout << "  Top -> " << s.top() << "\n";
     s.pop();
     while (!s.empty()) {
-        cout << "         Truck" << s.top().number << "[" << s.top().type << "]\n";
+        cout << "         " << s.top() << "\n";
         s.pop();
     }
     cout << "  Bottom\n";
 }
 
-// Simulation logic
-// Decrement the front order's remaining time by one. When it hits zero, load
-// it onto the current truck for that type. If the truck is full, dispatch it
-// onto the LIFO stack and start a new truck with the next number.
-void processQueue(queue<Order>& q,
-                  Truck&             currentTruck,
-                  stack<Truck>& dispatched,
-                  int&               truckCounter,
-                  int                truckCapacity) {
-    if (q.empty()) return;
+// -----------------------------------------------------------------------------
+// Main simulation (mirrors the pseudocode step-for-step)
+// -----------------------------------------------------------------------------
 
-    q.front().remaining--;
-
-    if (q.front().remaining <= 0) {
-        Order completed = q.front();
-        q.pop();
-        currentTruck.orders.push_back(completed);
-
-        if (static_cast<int>(currentTruck.orders.size()) >= truckCapacity) {
-            dispatched.push(currentTruck);
-            truckCounter++;
-            currentTruck.number = truckCounter;
-            currentTruck.orders.clear();
-        }
-    }
-}
-
-// Route a freshly generated order to the queue matching its type.
-void enqueueOrder(const Order& o,
-                  queue<Order>& qS,
-                  queue<Order>& qM,
-                  queue<Order>& qB) {
-    switch (o.type) {
-        case 'S': qS.push(o); break;
-        case 'M': qM.push(o); break;
-        case 'B': qB.push(o); break;
-    }
-}
-  
 int main() {
-    // Simulation parameters. 
-    // TRUCK_CAPACITY is configurable, change this single constant to retune the system.
-    constexpr int TIME_STEPS     = 30;
-    constexpr int TRUCK_CAPACITY = 5;
+    // ----------------------------
+    // Initialize simulation parameters
+    // ----------------------------
+    constexpr int time_steps     = 30;
+    constexpr int truck_capacity = 5;
+    constexpr array<char, 3> order_types{'S', 'M', 'B'};
 
-    // Three FIFO queues, one per order type.
-    queue<Order> queueS, queueM, queueB;
+    // Queues for each order type (holding the processing_time of each order).
+    queue<int> Queue_S;
+    queue<int> Queue_M;
+    queue<int> Queue_B;
 
-    // LIFO stack of dispatched trucks.
-    stack<Truck> dispatchedTrucks;
+    // Stack for dispatched trucks, holding labels like "Truck1[S]".
+    stack<string> TruckStack;
 
-    // Per-type truck counters and the truck currently being filled.
-    int   truckCountS = 1, truckCountM = 1, truckCountB = 1;
-    Truck currentTruckS{1, 'S', {}};
-    Truck currentTruckM{1, 'M', {}};
-    Truck currentTruckB{1, 'B', {}};
+    // Per-type truck counters and per-type processed counters.
+    map<char, int> truck_counters {{'S', 0}, {'M', 0}, {'B', 0}};
+    map<char, int> processed_count{{'S', 0}, {'M', 0}, {'B', 0}};
 
-    // Record of every generated order for the final report.
-    vector<Order> allOrders;
+    // Log all generated orders for the final report.
+    vector<OrderLogEntry> OrderLog;
 
     // Random generators (Mersenne Twister seeded from random_device).
     random_device rd;
@@ -124,38 +92,74 @@ int main() {
     uniform_int_distribution<int> typeDist(0, 2);    // 0=S, 1=M, 2=B
     uniform_int_distribution<int> procDist(1, 4);    // processing time
 
-    constexpr array<char, 3> types{'S', 'M', 'B'};
-
     cout << "=== Warehouse Order Dispatch Simulation ===\n";
-    cout << "Time steps: " << TIME_STEPS
-              << ", Truck capacity: " << TRUCK_CAPACITY << "\n\n";
+    cout << "Time steps: " << time_steps
+         << ", Truck capacity: " << truck_capacity << "\n\n";
 
-    for (int t = 1; t <= TIME_STEPS; ++t) {
-        cout << "--------------------------------------------\n";
-        cout << "Time Step " << t << ":\n";
+    // ----------------------------
+    // Simulation loop
+    // ----------------------------
+    for (int time = 1; time <= time_steps; ++time) {
 
-        // 1. Process the current front of each queue first, so that an order
-        // arriving at step T is shown with its full processing time at T
-        // and is only decremented from T+1 onward.
-        processQueue(queueS, currentTruckS, dispatchedTrucks, truckCountS, TRUCK_CAPACITY);
-        processQueue(queueM, currentTruckM, dispatchedTrucks, truckCountM, TRUCK_CAPACITY);
-        processQueue(queueB, currentTruckB, dispatchedTrucks, truckCountB, TRUCK_CAPACITY);
-
-        // 2. Generate 0 to 3 new arrivals.
-        int numArrivals = arrivalDist(gen);
+        // ----------------------------
+        // Generate new random orders
+        // ----------------------------
+        int num_new_orders = arrivalDist(gen);
         vector<char> newArrivals;
-        newArrivals.reserve(numArrivals);
+        newArrivals.reserve(num_new_orders);
 
-        for (int i = 0; i < numArrivals; ++i) {
-            char type = types[typeDist(gen)];
-            int  proc = procDist(gen);
-            Order o{type, proc, proc, t};
-            allOrders.push_back(o);
-            newArrivals.push_back(type);
-            enqueueOrder(o, queueS, queueM, queueB);
+        for (int i = 0; i < num_new_orders; ++i) {
+            char order_type      = order_types[typeDist(gen)];
+            int  processing_time = procDist(gen);
+
+            // Add to appropriate queue.
+            if      (order_type == 'S') Queue_S.push(processing_time);
+            else if (order_type == 'M') Queue_M.push(processing_time);
+            else if (order_type == 'B') Queue_B.push(processing_time);
+
+            // Log the order.
+            OrderLog.push_back({time, order_type, processing_time});
+            newArrivals.push_back(order_type);
         }
 
-        // 3. Display new arrivals for this time step.
+        // ----------------------------
+        // Process queues
+        // ----------------------------
+        for (char queue_type : order_types) {
+            // Pick the queue corresponding to this type.
+            queue<int>* q = nullptr;
+            if      (queue_type == 'S') q = &Queue_S;
+            else if (queue_type == 'M') q = &Queue_M;
+            else                        q = &Queue_B;
+
+            if (!q->empty()) {
+                // Decrement the front order's processing_time by 1.
+                q->front()--;
+
+                if (q->front() <= 0) {
+                    // Remove the front order from the queue.
+                    q->pop();
+                    processed_count[queue_type]++;
+
+                    // Check if the truck for this type is full.
+                    if (processed_count[queue_type] >= truck_capacity) {
+                        truck_counters[queue_type]++;
+                        string label = "Truck"
+                            + to_string(truck_counters[queue_type])
+                            + "[" + string(1, queue_type) + "]";
+                        TruckStack.push(label);
+                        processed_count[queue_type] = 0;
+                    }
+                }
+            }
+        }
+
+        // ----------------------------
+        // Display current state
+        // ----------------------------
+        cout << "Time Step: " << time << "\n";
+
+        // Print new arrivals.
         cout << "New Orders: ";
         if (newArrivals.empty()) {
             cout << "none";
@@ -167,33 +171,25 @@ int main() {
         }
         cout << "\n";
 
-        // 4. Display the state of all queues and the dispatched stack.
-        printQueue("S", queueS);
-        printQueue("M", queueM);
-        printQueue("B", queueB);
-        printStack(dispatchedTrucks);
+        // Print queue states.
+        printQueue('S', Queue_S);
+        printQueue('M', Queue_M);
+        printQueue('B', Queue_B);
+
+        // Print dispatched trucks stack (top first).
+        printStack(TruckStack);
+
         cout << "\n";
     }
 
-    // Final reporting (bonus: enhanced output / reporting).
-    cout << "Final Dispatched Trucks Stack:\n";
-    printStack(dispatchedTrucks);
-
-    const size_t totalDispatched = dispatchedTrucks.size();
-    const size_t inQueues = queueS.size() + queueM.size() + queueB.size();
-    const size_t inProgress = currentTruckS.orders.size() + currentTruckM.orders.size() + currentTruckB.orders.size();
-
-    cout << "\nSummary:\n";
-    cout << "  Total orders generated: " << allOrders.size() << "\n";
-    cout << "  Total trucks dispatched: " << totalDispatched << "\n";
-    cout << "  Orders still waiting in queues: " << inQueues << "\n";
-    cout << "  Orders loaded on undispatched trucks: " << inProgress << "\n";
-
-    // Final CSV-style table of every generated order.
-    cout << "Final Generated Orders Table:\n";
+    // ----------------------------
+    // Print final generated orders table
+    // ----------------------------
+    cout << "============================================\n";
+    cout << "Generated Orders (time_step,type,processing_time):\n";
     cout << "time_step,type,processing_time\n";
-    for (const auto& o : allOrders) {
-        cout << o.time_step << "," << o.type << "," << o.processing_time << "\n";
+    for (const auto& o : OrderLog) {
+        cout << o.time << "," << o.type << "," << o.processing_time << "\n";
     }
 
     return 0;
