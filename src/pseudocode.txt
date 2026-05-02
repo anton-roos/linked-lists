@@ -1,0 +1,101 @@
+BEGIN
+
+  // ----------------------------
+  // Initialize simulation parameters
+  // ----------------------------
+  SET time_steps = 30
+  SET truck_capacity = 5
+  SET order_types = ['S', 'M', 'B']
+
+  // Queues for each order type
+  CREATE empty queue Queue_S
+  CREATE empty queue Queue_M
+  CREATE empty queue Queue_B
+
+  // Stack for dispatched trucks
+  CREATE empty stack TruckStack
+  SET truck_counters['S'] = 0
+  SET truck_counters['M'] = 0
+  SET truck_counters['B'] = 0
+
+  // Log all generated orders
+  CREATE empty list OrderLog
+
+  // ----------------------------
+  // Simulation loop
+  // ----------------------------
+  FOR time = 1 TO time_steps
+
+      // ----------------------------
+      // Generate new random orders
+      // ----------------------------
+      SET num_new_orders = random integer from 0 to 3
+
+      FOR i = 1 TO num_new_orders
+          SELECT order_type randomly from order_types
+          SET processing_time = random integer from 1 to 4
+
+          // Add to appropriate queue
+          IF order_type == 'S' THEN enqueue processing_time into Queue_S
+          IF order_type == 'M' THEN enqueue processing_time into Queue_M
+          IF order_type == 'B' THEN enqueue processing_time into Queue_B
+
+          // Log order
+          ADD {time, order_type, processing_time} TO OrderLog
+      END FOR
+
+      // ----------------------------
+      // Process queues
+      // ----------------------------
+      FOR each queue_type IN ['S','M','B']
+
+          SET queue = corresponding queue (Queue_S, Queue_M, Queue_B)
+          IF queue is NOT empty THEN
+              DECREMENT front order's processing_time by 1
+              IF front order's processing_time <= 0 THEN
+                  REMOVE front order from queue
+                  INCREMENT processed_count[queue_type] by 1
+
+                  // Check if truck is full
+                  IF processed_count[queue_type] >= truck_capacity THEN
+                      INCREMENT truck_counters[queue_type] by 1
+                      PUSH "Truck" + truck_counters[queue_type] + "[" + queue_type + "]" INTO TruckStack
+                      SET processed_count[queue_type] = 0
+                  END IF
+              END IF
+          END IF
+      END FOR
+
+      // ----------------------------
+      // Display current state
+      // ----------------------------
+      PRINT "Time Step:", time
+
+      // Print new arrivals
+      PRINT "New Orders:", list of newly generated order_types
+
+      // Print queue states
+      PRINT "Queue S:", contents of Queue_S with processing times
+      PRINT "Queue M:", contents of Queue_M with processing times
+      PRINT "Queue B:", contents of Queue_B with processing times
+
+      // Print dispatched trucks stack (top first)
+      IF TruckStack is empty THEN
+          PRINT "Stack: empty"
+      ELSE
+          PRINT "Stack:", list of items in TruckStack (top to bottom)
+      END IF
+
+      PRINT blank line
+
+  END FOR
+
+  // ----------------------------
+  // Print final generated orders table
+  // ----------------------------
+  PRINT "Generated Orders (time_step,type,processing_time):"
+  FOR each order IN OrderLog
+      PRINT order.time, ",", order.type, ",", order.processing_time
+  END FOR
+
+END
